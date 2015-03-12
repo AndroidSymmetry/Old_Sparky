@@ -12,11 +12,11 @@ clear
 THREAD="-j$(grep -c ^processor /proc/cpuinfo)"
 KERNEL="zImage"
 DTBIMAGE="dtb"
-DEFCONFIG="lk_defconfig"
+DEFCONFIG="despair_defconfig"
 
 # Kernel Details
-BASE_AK_VER="Shamu"
-VER=".R39"
+BASE_AK_VER="Despair-5.1-"
+VER=".R1"
 AK_VER="$BASE_AK_VER$VER"
 
 # Vars
