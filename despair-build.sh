@@ -16,7 +16,7 @@ DEFCONFIG="despair_defconfig"
 
 # Kernel Details
 BASE_AK_VER="Despair-5.1-"
-VER=".R2"
+VER=".R3"
 AK_VER="$BASE_AK_VER$VER"
 
 # Vars
