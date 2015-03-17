@@ -35,6 +35,10 @@
 #include <linux/wake_gestures.h>
 #endif
 
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+#include "touchx.h"
+#endif
+
 enum {
 	STATE_UNKNOWN,
 	STATE_ACTIVE,
@@ -400,6 +404,11 @@ struct mxt_data {
 	struct mxt_tdat_section fw;
 	struct mxt_tdat_section tsett;
 };
+
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+struct touchxs touchxp;
+EXPORT_SYMBOL(touchxp);
+#endif
 
 #define mxt_unlock(s)	{\
 		up(s);\
@@ -1419,6 +1428,11 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 	int x;
 	int y;
 	int tool;
+	
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+	unsigned char number_of_fingers_actually_touching;
+	static char finger_register[32];
+#endif
 
 	/* do not report events if input device not yet registered */
 	if (!data->enable_reporting)
@@ -1443,7 +1457,14 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 		(data->t100_aux_area) ? message[data->t100_aux_area] : 0,
 		(data->t100_aux_ampl) ? message[data->t100_aux_ampl] : 0,
 		(data->t100_aux_vect) ? message[data->t100_aux_vect] : 0);
-
+		
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+	if (touchxp.touchx)
+		mutex_lock(&touchxp.virtual_touch_mutex);
+		
+	finger_register[id < 32 ? id : 31] += 1;
+#endif
+		
 	input_mt_slot(input_dev, id);
 
 	if (status & MXT_T100_DETECT) {
@@ -1453,6 +1474,20 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 			tool = MT_TOOL_PEN;
 		else
 			tool = MT_TOOL_FINGER;
+			
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+		if (touchxp.touchx) {
+			int i;
+			number_of_fingers_actually_touching = 0;
+			for (i = 0; i < 32; i++) {
+				if (finger_register[i] != 0)
+					number_of_fingers_actually_touching++;
+			}
+			touchxp.touch_magic_dev = input_dev;
+			touchxp.touchx(&x, &y, id,
+				       number_of_fingers_actually_touching);
+		}
+#endif
 
 #ifdef CONFIG_WAKE_GESTURES
 		if (atomic_read(&data->suspended)) {
@@ -1482,8 +1517,17 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 					 message[data->t100_aux_vect]);
 	} else {
 		/* Touch no longer active, close out slot */
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+		touchxp.finger_down = 0;
+		finger_register[id < 32 ? id : 31] = 0;
+#endif
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 0);
 	}
+	
+#ifdef CONFIG_TOUCHSCREEN_TOUCHX_BASE
+	if (touchxp.touchx)
+		mutex_unlock(&touchxp.virtual_touch_mutex);
+#endif
 
 	data->update_input = true;
 }
